@@ -1,2 +1,2 @@
-./resources
-./targets
+resources/*
+targets/*
