@@ -53,8 +53,10 @@ class TinyLlama_1_1B_Chat_v1_0HfCreator(model_base.ModelHfCreatorBase):
 
 @model_base.MODEL_EXPORT_HELPER_FACTORY.register_export_helper(TinyLlama_1_1B_Chat_v1_0_type)
 class TinyLlama_1_1B_Chat_v1_0ExportHelper(model_base.ModelExportHelperBase):
-    def __init__(self):
-        super(TinyLlama_1_1B_Chat_v1_0ExportHelper, self).__init__()
+    def __init__(self, hf_config=None, seq_len=None, kv_cache_max_len=None):
+        super(TinyLlama_1_1B_Chat_v1_0ExportHelper, self).__init__(hf_config=hf_config,
+                                                                   seq_len=seq_len,
+                                                                   kv_cache_max_len=kv_cache_max_len)
     
     def get_model_example_inputs(self):
         return super(TinyLlama_1_1B_Chat_v1_0ExportHelper, self).get_model_example_inputs()

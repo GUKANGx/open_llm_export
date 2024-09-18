@@ -9,12 +9,14 @@ from . import model_tiny_llama
 
 
 class ModelExporter(object):
-    def __init__(self):
+    def __init__(self, seq_len=None, kv_cache_max_len=None):
         super(ModelExporter, self).__init__()
         self.tokenizer_model = None
         self.hf_model = None
         self.model_impl = None
         self.max_gen_tokens = 8
+        self.seq_len = seq_len
+        self.kv_cache_max_len = kv_cache_max_len
         self.export_helper = None
 
     @staticmethod
@@ -42,10 +44,15 @@ class ModelExporter(object):
         self.hf_model = hf_creator.get_hf_model(hf_model_path)
         print(f"exporter: load hf model, done.")
         # 3. create impl
+        print(f"exporter: creating model impl...")
         self.model_impl = model_base.MODEL_IMPL_FACTORY.get_model(model_type)()
         self.model_impl.load(self.hf_model)
+        print(f"exporter: create model, done.")
         # 4. export helper
-        self.export_helper = model_base.MODEL_EXPORT_HELPER_FACTORY.get_export_helper(model_type)()
+        print(f"exporter: preparing export helper...")
+        self.export_helper = model_base.MODEL_EXPORT_HELPER_FACTORY.get_export_helper(model_type)(
+            hf_config=self.hf_model.config, seq_len=self.seq_len, kv_cache_max_len=self.kv_cache_max_len)
+        print(f"exporter: prepare export helper, done.")
 
     def text_to_ids(self, prompt):
         # torch tensor

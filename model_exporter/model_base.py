@@ -137,10 +137,15 @@ MODEL_HF_CREATOR_FACTORY = ModelHfCreatorFactory()
 
 
 class ModelExportHelperBase(object):
-    def __init__(self):
+    def __init__(self, hf_config=None, seq_len=None, kv_cache_max_len=None):
         super(ModelExportHelperBase, self).__init__()
+        self.hf_config = hf_config
+        self.seq_len = seq_len
+        self.kv_cache_max_len = kv_cache_max_len
+        print(f"ModelExportHelperBase: seq_len -> {self.seq_len}, kv_cache_max_len -> {self.kv_cache_max_len}")
 
     def get_model_example_inputs(self):
+
         # TODO:
         pass
 

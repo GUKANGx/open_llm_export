@@ -10,6 +10,6 @@ if __name__ == "__main__":
 
     tiny_llama_model_type = "TinyLlama_1_1B_Chat_v1_0"
     tiny_llama_hf_model_path = os.path.join(RESOURCE_DIR, tiny_llama_model_type)
-    tiny_llama_exporter = ModelExporter()
+    tiny_llama_exporter = ModelExporter(seq_len=32, kv_cache_max_len=2048)
     tiny_llama_exporter.load(tiny_llama_hf_model_path, tiny_llama_model_type)
     tiny_llama_exporter.export_onnx("dsadsa", need_test=True, prompt="hello")
