@@ -2,14 +2,19 @@ import torch
 import transformers
 import onnx
 import onnxsim
+from onnxsim import simplify
 import onnxruntime
+import os
+import shutil
+
+from .compress_model import compress_onnx_model, uncompress_onnx_model
 
 from . import model_base
 from . import model_tiny_llama
 
 
 class ModelExporter(object):
-    def __init__(self, seq_len=None, kv_cache_max_len=None):
+    def __init__(self, seq_len=None, kv_cache_max_len=None, is_dynamic_shape=False):
         super(ModelExporter, self).__init__()
         self.tokenizer_model = None
         self.hf_model = None
@@ -17,7 +22,9 @@ class ModelExporter(object):
         self.max_gen_tokens = 8
         self.seq_len = seq_len
         self.kv_cache_max_len = kv_cache_max_len
+        self.is_dynamic_shape = is_dynamic_shape
         self.export_helper = None
+        self.model_type = None
 
     @staticmethod
     def support_model_type_list():
@@ -135,8 +142,45 @@ class ModelExporter(object):
                                                                  f"hf_model_output_ids -> {hf_model_output_ids}\n" \
                                                                  f"impl_model_output_ids -> {impl_model_output_ids}"
             print(f"exporter: hf model is same to impl model.")
+        # prepare
+        shutil.rmtree(onnx_model_path, ignore_errors=True)
+        os.mkdir(onnx_model_path, 777)
+        onnx_tmp_path = f"{onnx_model_path}/tmp"
+        os.mkdir(onnx_tmp_path, 777)
+        example_inputs_name, example_inputs_tensor = self.export_helper.get_model_example_inputs()
+        example_outputs_name = self.export_helper.get_model_example_outputs()
         # export onnx model
-        # TODO:
+        print(f"exporter: torch onnx export doing...")
+        torch.onnx.export(
+            self.model_impl,
+            tuple(example_inputs_tensor),
+            f"{onnx_tmp_path}/model.onnx",
+            input_names=example_inputs_name,
+            output_names=example_outputs_name,
+        )
+        print(f"exporter: torch onnx export, done.")
+        # simplify
+        print(f"exporter: onnx simplify doing...")
+        onnx_model = onnx.load(f"{onnx_tmp_path}/model.onnx")
+        size_th_kb = 1024
+        size_th_bytes = size_th_kb * 1024
+        onnx_model, removed_nodes = compress_onnx_model(onnx_model, size_th_bytes=size_th_bytes)
+        tensor_size_threshold = f"{size_th_kb}KB"
+        skipped_optimizers = []
+        onnx_model, check = simplify(onnx_model,
+                                     tensor_size_threshold=tensor_size_threshold,
+                                     skipped_optimizers=skipped_optimizers)
+        assert check, "simplify failed."
+        onnx_model = uncompress_onnx_model(onnx_model, removed_nodes)
+        onnx.save(
+            onnx_model,
+            f"{onnx_model_path}/model.onnx",
+            save_as_external_data=True,
+            all_tensors_to_one_file=True,
+            location="weights.pb"
+        )
+        print(f"exporter: onnx simplify, done.")
+        shutil.rmtree(onnx_tmp_path, ignore_errors=True)
         # test after, onnx and impl
         # TODO:
 

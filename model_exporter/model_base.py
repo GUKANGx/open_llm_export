@@ -71,6 +71,7 @@ class DecoderOnlyModelImplBase(nn.Module):
                 past_key_value=past_key_values[i] if past_key_values is not None else None,
                 output_attentions=False,
                 use_cache=True)
+            # print(f"past_key_value_out[0] shape: {past_key_value_out[0].shape}")
             past_key_values_out.append(past_key_value_out)
         hidden_states = self.norm(hidden_states)
         # logit
@@ -137,17 +138,40 @@ MODEL_HF_CREATOR_FACTORY = ModelHfCreatorFactory()
 
 
 class ModelExportHelperBase(object):
-    def __init__(self, hf_config=None, seq_len=None, kv_cache_max_len=None):
+    def __init__(self, hf_config=None, seq_len=None, kv_cache_max_len=None, is_dynamic_shape=False):
         super(ModelExportHelperBase, self).__init__()
         self.hf_config = hf_config
         self.seq_len = seq_len
         self.kv_cache_max_len = kv_cache_max_len
-        print(f"ModelExportHelperBase: seq_len -> {self.seq_len}, kv_cache_max_len -> {self.kv_cache_max_len}")
+        self.is_dynamic_shape = is_dynamic_shape
+        self.head_dim = self.hf_config.hidden_size // self.hf_config.num_attention_heads
+        print(f"ModelExportHelperBase: seq_len -> {self.seq_len}, kv_cache_max_len -> {self.kv_cache_max_len}, "
+              f"is_dynamic_shape - {self.is_dynamic_shape}, head_dim -> {self.head_dim}")
 
     def get_model_example_inputs(self):
+        input_examples_name = ["input_ids", "attention_mask", "position_ids"]
+        input_examples_tensor = [
+            torch.ones(1, self.seq_len, dtype=torch.int32),
+            torch.ones(1, 1, self.seq_len, self.kv_cache_max_len, dtype=torch.float32),
+            torch.ones(1, self.seq_len, dtype=torch.int32),
+        ]
+        past_key_value_example_tensors = []
+        for i in range(0, self.hf_config.num_hidden_layers):
+            input_examples_name.extend([f"past_key{i}", f"past_value{i}"])
+            past_key_value_example_tensors.append([
+                torch.ones(1, self.hf_config.num_key_value_heads, self.kv_cache_max_len - self.seq_len,
+                           self.head_dim, dtype=torch.float32),
+                torch.ones(1, self.hf_config.num_key_value_heads, self.kv_cache_max_len - self.seq_len,
+                           self.head_dim, dtype=torch.float32),
+            ])
+        input_examples_tensor.append(past_key_value_example_tensors)
+        return input_examples_name, input_examples_tensor
 
-        # TODO:
-        pass
+    def get_model_example_outputs(self):
+        output_examples_name = ["logit"]
+        for i in range(0, self.hf_config.num_hidden_layers):
+            output_examples_name.extend([f"past_key_out{i}", f"past_value_out{i}"])
+        return output_examples_name
 
 
 class ModelExportHelperFactory(object):
